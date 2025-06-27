@@ -4,10 +4,10 @@ import logging
 
 # Configuration
 NODES = {
-    "mainnet-doc": "http://mainnet-doc:9944",
+    "mainnet-dopey": "http://mainnet-dopey:9944",
 }
 NTFY_TOPIC = "abumaherdevops"
-CHECK_INTERVAL = 30  # seconds
+CHECK_INTERVAL = 120  # seconds
 SYNCED_NODES = {node: False for node in NODES}  # Tracks sync status
 node_block_history = {}  # Stores previous block height and timestamp
 
