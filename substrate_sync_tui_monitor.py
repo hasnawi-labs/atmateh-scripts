@@ -9,10 +9,11 @@ from typing import Dict, Optional, Tuple, Any
 
 # Configuration (move to a config file later)
 NODES: Dict[str, str] = {
-    "mainnet-doc": "http://mainnet-doc:9944",
     "mainnet-dopey": "http://mainnet-dopey:9944",
 }
 
+# Global variable to track block history
+node_block_history: Dict[str, Tuple[int, float]] = {}
 
 class NodeSyncMonitor(Screen):
     """Main screen for monitoring node synchronization."""
@@ -21,7 +22,7 @@ class NodeSyncMonitor(Screen):
         """Initialize the screen with block history tracking."""
         super().__init__(*args, **kwargs)
         # Track block history for each node
-        self.node_block_history: Dict[str, Tuple[int, float]] = {}
+        self.node_block_history: Dict[str, Tuple[int, float]] = node_block_history
 
     def compose(self) -> ComposeResult:
         """Create child widgets for the screen."""
@@ -93,36 +94,41 @@ class NodeSyncMonitor(Screen):
 
         return "Calculating..."
 
-    def format_time_duration(self, total_seconds: int) -> str:
-        """Convert total seconds into a human-readable time duration."""
-        days = int(total_seconds // 86400)
-        hours = int((total_seconds % 86400) // 3600)
-        minutes = int((total_seconds % 3600) // 60)
-        seconds = int(total_seconds % 60)
+    def calculate_eta(self, node_name: str, current_block: int, target_block_number: int) -> str:
+        """Calculate ETA for full sync based on sync speed."""
+        global node_block_history
 
-        parts = []
-        if days > 0:
-            parts.append(f"{days}d")
-        if hours > 0:
-            parts.append(f"{hours}h")
-        if minutes > 0:
-            parts.append(f"{minutes}m")
-        if seconds > 0 or not parts:
-            parts.append(f"{seconds}s")
+        if node_name in node_block_history:
+            previous_block_number, previous_measurement_timestamp = node_block_history[node_name]
+            time_elapsed = time.time() - previous_measurement_timestamp
+            sync_speed = (
+                (current_block - previous_block_number) / time_elapsed
+                if time_elapsed > 0
+                else 0
+            )
+        else:
+            sync_speed = None  # First measurement, no previous data
 
-        return " ".join(parts)
+        # Update previous block state
+        node_block_history[node_name] = (current_block, time.time())
 
-    def calculate_eta(self, current_block: int, highest_block: int) -> str:
-        """Calculate estimated time to full synchronization."""
-        blocks_left = highest_block - current_block
-        # Assuming 6 seconds per block
-        total_seconds = blocks_left * 6
+        if sync_speed and sync_speed > 0:
+            remaining_blocks_to_sync = target_block_number - current_block
+            eta_seconds = remaining_blocks_to_sync / sync_speed
 
-        # If sync is complete or near complete
-        if blocks_left <= 1:
-            return "Synced ✓"
+            # Convert to human-readable time
+            days = int(eta_seconds // 86400)
+            hours = int((eta_seconds % 86400) // 3600)
+            minutes = int((eta_seconds % 3600) // 60)
 
-        return f"{self.format_time_duration(total_seconds)}"
+            if days > 0:
+                return f"{days}d {hours}h {minutes}m"
+            elif hours > 0:
+                return f"{hours}h {minutes}m"
+            else:
+                return f"{minutes}m"
+        else:
+            return "Calculating..."
 
     def calculate_block_age(self, current_block: int, highest_block: int) -> str:
         """Calculate the age of the latest synced block."""
@@ -130,7 +136,16 @@ class NodeSyncMonitor(Screen):
         # Assuming 6 seconds per block
         total_seconds = blocks_left * 6
 
-        return f"{self.format_time_duration(total_seconds)}"
+        days = int(total_seconds // 86400)
+        hours = int((total_seconds % 86400) // 3600)
+        minutes = int((total_seconds % 3600) // 60)
+
+        if days > 0:
+            return f"{days}d {hours}h {minutes}m"
+        elif hours > 0:
+            return f"{hours}h {minutes}m"
+        else:
+            return f"{minutes}m"
 
     def update_node_stats(self) -> None:
         """Update node synchronization statistics."""
@@ -151,7 +166,7 @@ class NodeSyncMonitor(Screen):
             sync_rate = self.calculate_sync_rate(node_name, current_block)
 
             # Calculate ETA
-            eta = self.calculate_eta(current_block, highest_block)
+            eta = self.calculate_eta(node_name, current_block, highest_block)
 
             # Calculate block age
             block_age = self.calculate_block_age(current_block, highest_block)

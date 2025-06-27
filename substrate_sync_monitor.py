@@ -20,19 +20,6 @@ logging.basicConfig(
 logger = logging.getLogger("SyncChecker")
 
 
-def get_sync_status(node_identifier, url):
-    """Query a Substrate node for its sync status."""
-    payload = {"jsonrpc": "2.0", "method": "system_syncState", "params": [], "id": 1}
-    try:
-        response = requests.post(url, json=payload, timeout=5)
-        response.raise_for_status()
-        data = response.json().get("result", {})
-        return data.get("currentBlock"), data.get("highestBlock")
-    except requests.RequestException as e:
-        logger.error("🚨 [%s] Failed to fetch sync status: %s", node_identifier, e)
-        return None, None
-
-
 def calculate_eta(node_identifier, current_block_number, target_block_number):
     """Calculate ETA for full sync based on sync speed."""
     global node_block_history
@@ -123,12 +110,54 @@ def calculate_sync_rate(node_identifier, current_block_number, target_block_numb
     return "Calculating..."
 
 
+def get_system_health(node_identifier, url):
+    """Query a Substrate node for its system health and sync status."""
+    health_payload = {
+        "jsonrpc": "2.0",
+        "method": "system_health",
+        "params": [],
+        "id": 1,
+    }
+    sync_payload = {
+        "jsonrpc": "2.0",
+        "method": "system_syncState",
+        "params": [],
+        "id": 1,
+    }
+    try:
+        health_response = requests.post(url, json=health_payload, timeout=5)
+        sync_response = requests.post(url, json=sync_payload, timeout=5)
+
+        health_response.raise_for_status()
+        sync_response.raise_for_status()
+
+        health_data = health_response.json().get("result", {})
+        sync_data = sync_response.json().get("result", {})
+
+        return {
+            "is_syncing": health_data.get("isSyncing", True),
+            "current_block": sync_data.get("currentBlock"),
+            "highest_block": sync_data.get("highestBlock"),
+            "peers": health_data.get("peers", 0),
+        }
+    except requests.RequestException as e:
+        logger.error("🚨 [%s] Failed to fetch system health: %s", node_identifier, e)
+        return None
+
+
 def check_nodes():
     """Check the sync status of all nodes and send notifications if needed."""
     for node_identifier, node_rpc_endpoint in NODES.items():
-        current_block_number, target_block_number = get_sync_status(
-            node_identifier, node_rpc_endpoint
-        )
+        node_health = get_system_health(node_identifier, node_rpc_endpoint)
+
+        if node_health is None:
+            continue  # Skip if there was an error fetching data
+
+        current_block_number = node_health.get("current_block")
+        target_block_number = node_health.get("highest_block")
+        is_syncing = node_health.get("is_syncing", True)
+        peers = node_health.get("peers", 0)
+
         if (
             current_block_number is None
             or target_block_number is None
@@ -136,9 +165,12 @@ def check_nodes():
         ):
             continue  # Skip if there was an error fetching data or divide-by-zero risk
 
+        # More strict sync condition: not syncing AND very close to target block
         is_node_synced = (
-            current_block_number >= target_block_number - 1
-        )  # Allow slight lag
+            not is_syncing
+            and current_block_number >= target_block_number - 10  # Allow small buffer
+        )
+
         estimated_time_to_sync = calculate_eta(
             node_identifier, current_block_number, target_block_number
         )
@@ -157,10 +189,12 @@ def check_nodes():
         )
 
         logger.info(
-            "🔄 [%s] Current: %s | Target: %s | Synced: %s | ETA: %s | Progress: %s | Blocks Left: %s | Latest Synced Block Age: %s | Sync Rate: %s",
+            "🔄 [%s] Current: %s | Target: %s | Syncing: %s | Peers: %s | Synced: %s | ETA: %s | Progress: %s | Blocks Left: %s | Latest Synced Block Age: %s | Sync Rate: %s",
             node_identifier,
             current_block_number,
             target_block_number,
+            is_syncing,
+            peers,
             is_node_synced,
             estimated_time_to_sync,
             sync_progress_str,
