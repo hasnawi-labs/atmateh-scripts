@@ -171,6 +171,12 @@ def check_nodes():
             and current_block_number >= target_block_number - 10  # Allow small buffer
         )
 
+
+        # Calculate sync rate before updating block history in calculate_eta
+        sync_rate = calculate_sync_rate(
+            node_identifier, current_block_number, target_block_number
+        )
+
         estimated_time_to_sync = calculate_eta(
             node_identifier, current_block_number, target_block_number
         )
@@ -183,10 +189,7 @@ def check_nodes():
         block_age_seconds = remaining_blocks_to_sync * 6
         block_age_str = format_time_duration(block_age_seconds)
 
-        # Calculate sync rate
-        sync_rate = calculate_sync_rate(
-            node_identifier, current_block_number, target_block_number
-        )
+
 
         logger.info(
             "🔄 [%s] Current: %s | Target: %s | Syncing: %s | Peers: %s | Synced: %s | ETA: %s | Progress: %s | Blocks Left: %s | Latest Synced Block Age: %s | Sync Rate: %s",
