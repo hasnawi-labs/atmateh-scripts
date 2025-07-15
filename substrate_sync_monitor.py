@@ -1,11 +1,11 @@
+import json
 import time
 import requests
 import logging
 
-# Configuration
-NODES = {
-    "mainnet-dopey": "http://mainnet-dopey:9944",
-}
+with open("config/nodes.json", "r", encoding="utf-8") as f:
+    NODES = json.load(f)
+
 NTFY_TOPIC = "abumaherdevops"
 CHECK_INTERVAL = 120  # seconds
 SYNCED_NODES = {node: False for node in NODES}  # Tracks sync status

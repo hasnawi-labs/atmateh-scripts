@@ -1,3 +1,4 @@
+import json
 import time
 import requests
 from textual.app import App, ComposeResult
@@ -7,10 +8,8 @@ from textual.screen import Screen
 from textual.widgets import Static
 from typing import Dict, Optional, Tuple, Any
 
-# Configuration (move to a config file later)
-NODES: Dict[str, str] = {
-    "mainnet-dopey": "http://mainnet-dopey:9944",
-}
+with open("config/nodes.json", "r", encoding="utf-8") as f:
+    NODES = json.load(f)
 
 # Global variable to track block history
 node_block_history: Dict[str, Tuple[int, float]] = {}
