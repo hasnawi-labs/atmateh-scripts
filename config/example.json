@@ -1,3 +1,9 @@
 {
-  "local-node": "http://localhost:9944"
+  "ntfy_topic": "your-ntfy-topic",
+  "nodes": {
+    "local-node": {
+      "url": "http://localhost:9944",
+      "notified": false
+    }
+  }
 }

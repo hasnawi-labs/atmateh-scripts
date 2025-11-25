@@ -3,12 +3,15 @@ import time
 import requests
 import logging
 
-with open("config/nodes.json", "r", encoding="utf-8") as f:
-    NODES = json.load(f)
+CONFIG_FILE = "config/nodes.json"
 
-NTFY_TOPIC = "abumaherdevops"
+with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+    CONFIG = json.load(f)
+
+NTFY_TOPIC = CONFIG.get("ntfy_topic", "")
+NODES = {node: data["url"] for node, data in CONFIG.get("nodes", {}).items()}
 CHECK_INTERVAL = 120  # seconds
-SYNCED_NODES = {node: False for node in NODES}  # Tracks sync status
+SYNCED_NODES = {node: data.get("notified", False) for node, data in CONFIG.get("nodes", {}).items()}  # Tracks sync status
 node_block_history = {}  # Stores previous block height and timestamp
 
 # Setup Logging
@@ -18,6 +21,17 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 logger = logging.getLogger("SyncChecker")
+
+
+def save_config():
+    """Save the current config state to the config file."""
+    global CONFIG
+    try:
+        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump(CONFIG, f, indent=2)
+        logger.info("💾 Config file updated successfully")
+    except Exception as e:
+        logger.error("⚠️ Failed to save config file: %s", e)
 
 
 def calculate_eta(node_identifier, current_block_number, target_block_number):
@@ -61,12 +75,18 @@ def calculate_eta(node_identifier, current_block_number, target_block_number):
 
 def send_ntfy_notification(node_identifier):
     """Send a notification when a node gets fully synced."""
+    global CONFIG
     message = f"✅ {node_identifier} is now fully synced! 🎉🚀"
     try:
         requests.post(
             f"https://ntfy.sh/{NTFY_TOPIC}", data=message.encode("utf-8"), timeout=5
         )
         logger.info("📢 [%s] Sent notification: %s", node_identifier, message)
+
+        # Update notified status in config
+        if node_identifier in CONFIG.get("nodes", {}):
+            CONFIG["nodes"][node_identifier]["notified"] = True
+            save_config()
     except requests.RequestException as e:
         logger.error("⚠️ [%s] Failed to send notification: %s", node_identifier, e)
 
