@@ -17,12 +17,9 @@ Monitors Substrate node sync status and sends notifications when nodes are fully
 
 ### Setup
 
-1. **Install dependencies:**
-```bash
-pip install requests
-```
+#### Option 1: Docker (Recommended)
 
-2. **Configure nodes:**
+1. **Configure nodes:**
 ```bash
 cp config/example.json config/nodes.json
 ```
@@ -40,10 +37,30 @@ Edit `config/nodes.json`:
 }
 ```
 
+3. **Run with Docker:**
+```bash
+docker run -v "$(pwd)/config:/app/config" glokos/substrate-sync-status:latest
+```
+
+#### Option 2: Local Python
+
+1. **Install dependencies:**
+```bash
+pip install requests
+```
+
+2. **Configure nodes** (same as above)
+
 3. **Run the monitor:**
 ```bash
 python substrate_sync_monitor.py
 ```
+
+### Docker Notes
+
+- Multi-architecture support: amd64, arm64 (M1/M2 Macs, Raspberry Pi 3/4/5), arm/v7 (Raspberry Pi 2/3)
+- For Tailscale networks: use IP addresses instead of hostnames in `config/nodes.json`
+- On macOS with Tailscale: add `--add-host=host.docker.internal:host-gateway` flag
 
 ### Configuration
 
